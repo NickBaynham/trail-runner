@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extreme Trail Runner — Phaser3</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app-wrap">
+    <header class="game-header" aria-label="Game title">
+      <div class="logo-mark" aria-hidden="true">
+        <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 72" width="52" height="66">
+          <g class="logo-bounce">
+            <ellipse class="logo-cap-brim" cx="28" cy="14" rx="22" ry="7" fill="#c62828" />
+            <ellipse class="logo-cap" cx="28" cy="12" rx="20" ry="10" fill="#e53935" />
+            <circle class="logo-head" cx="28" cy="26" r="11" fill="#f0c4a0" />
+            <rect class="logo-torso" x="16" y="36" width="24" height="22" rx="6" fill="#00acc1" />
+            <rect class="logo-shorts" x="15" y="54" width="26" height="10" rx="3" fill="#263238" />
+            <g class="logo-leg logo-leg-l">
+              <path d="M22 62 L18 70 L24 70 L26 62 Z" fill="#f0c4a0" />
+              <ellipse cx="21" cy="71" rx="5" ry="3" fill="#fff" />
+            </g>
+            <g class="logo-leg logo-leg-r">
+              <path d="M34 62 L38 70 L32 70 L30 62 Z" fill="#f0c4a0" />
+              <ellipse cx="35" cy="71" rx="5" ry="3" fill="#fff" />
+            </g>
+            <g class="logo-arm logo-arm-l">
+              <path d="M14 38 L6 48 L10 50 L16 40 Z" fill="#f0c4a0" />
+            </g>
+            <g class="logo-arm logo-arm-r">
+              <path d="M42 38 L50 48 L46 50 L40 40 Z" fill="#f0c4a0" />
+            </g>
+          </g>
+        </svg>
+      </div>
+      <h1 class="logo-title">Extreme Trail Runner</h1>
+    </header>
+    <div id="game-container"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="js/Projection.js"></script>
+  <script src="js/obstacles/Obstacle.js"></script>
+  <script src="js/obstacles/SodaCan.js"></script>
+  <script src="js/obstacles/Snake.js"></script>
+  <script src="js/obstacles/Stream.js"></script>
+  <script src="js/obstacles/RunnerNpc.js"></script>
+  <script src="js/DanCharacter.js"></script>
+  <script src="js/TrailRenderer.js"></script>
+  <script src="js/ObstacleManager.js"></script>
+  <script src="scenes/BootScene.js"></script>
+  <script src="scenes/GameScene.js"></script>
+  <script src="scenes/UIScene.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

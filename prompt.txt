@@ -1,0 +1,294 @@
+
+Build a complete browser-based running game using **Phaser 3** in JavaScript. The game should run locally in a browser with a simple setup and should be structured as a small web project.
+
+Project goal
+Create a polished, playable pseudo-3D trail running game starring a cartoon runner named **Dan**. The camera faces forward down the trail, and Dan appears animated near the center-bottom of the screen while the trail, hazards, and scenery move toward the player to simulate forward running. The player controls Dan with the mouse:
+- move mouse left/right to steer Dan across the trail
+- click to jump
+
+This is not an endless runner. The game has a fixed course and ends when Dan reaches the **Atlanta loop trailhead**.
+
+Tech requirements
+- Use **JavaScript + Phaser 3**
+- No TypeScript
+- Keep setup simple and easy to run locally
+- Use standard browser files:
+  - `index.html`
+  - `style.css`
+  - `main.js`
+  - optional supporting files such as `scenes/BootScene.js`, `scenes/GameScene.js`, `scenes/UIScene.js`, `assets/`
+- If external assets are needed, generate simple placeholder assets programmatically or include lightweight local assets
+- Do not require a heavy build system unless absolutely necessary
+- Prefer a version that can run with a simple local server
+
+Core gameplay
+Dan runs forward automatically.
+The player:
+- moves Dan left and right using the mouse position
+- clicks to make Dan jump
+
+Dan must:
+- stay on the trail
+- avoid hazards and other runners
+- reach the trailhead at the end of the Atlanta loop
+
+The game ends when:
+1. Dan collides with a hazard or runner
+2. Dan leaves the trail too far
+3. Dan reaches the end successfully
+
+Obstacles and hazards
+Include all of the following:
+- soda cans
+- moving snakes
+- streams that must be jumped over
+- other runners
+
+Behavior details
+Soda cans
+- stationary or lightly rolling obstacles
+- should encourage steering around them
+
+Snakes
+- animated/slithering
+- can move across the trail or diagonally
+- should feel alive and dangerous
+
+Streams
+- wider trail hazards
+- must be jumped
+- clearly readable before they arrive
+
+Other runners
+- appear less frequently than normal obstacles
+- can move toward Dan or away from him
+- may drift slightly across trail positions
+- should feel like occasional trail traffic, not a constant swarm
+
+Scoring
+Score is based on hazards successfully avoided.
+Examples:
+- passing a soda can safely
+- avoiding a snake
+- jumping a stream
+- avoiding another runner
+
+Display score live on screen.
+
+Visual style
+The game should look like a **stylized cartoon with semi-realistic environment cues**:
+- Dan should look like a cartoon trail runner, not a stick figure
+- the environment should include:
+  - trees
+  - hills
+  - rocky dirt trail
+  - uneven trail edges
+  - a natural outdoor forest feel
+
+Perspective / pseudo-3D requirements
+The game should use a pseudo-3D perspective:
+- the trail narrows toward the horizon
+- the trail widens in the foreground
+- hazards spawn far away and grow in size as they approach
+- scenery reinforces depth
+- Dan remains near the middle-bottom of the screen while the world flows toward him
+
+Important:
+This is not a top-down view.
+This is not a side-view platformer.
+This should feel like looking forward down the trail while running into the scene.
+
+Dan animation requirements
+Dan should be visible at all times and animated.
+Implement:
+- running cycle
+- arm swing
+- leg movement
+- subtle bounce/bob
+- jump animation
+- fall/crash animation for game over
+- subtle shadow under Dan
+
+Game over behavior
+If Dan collides with an obstacle or runner, or fails a stream jump:
+- animate Dan falling onto the trail
+- stop gameplay after the fall
+- show:
+  - `GAME OVER`
+  - caption: `ahhhhhh!`
+- show final score
+- show restart button
+
+Win behavior
+If Dan reaches the end of the trail:
+- stop gameplay
+- show:
+  - `Dan reached the Atlanta loop trailhead!`
+- show final score
+- allow restart
+
+Trail behavior
+The trail should:
+- be visually uneven and rocky
+- have a slightly undulating surface
+- include visible left/right boundaries
+- feel narrow enough to require skill
+- punish going clearly off-trail
+
+Best implementation:
+- Dan can move within trail bounds
+- if he goes too far beyond the trail edge, trigger failure
+
+Phaser-specific guidance
+Use Phaser scenes cleanly.
+Recommended scenes:
+- `BootScene` or `PreloadScene`
+- `GameScene`
+- `UIScene` or integrated HUD
+
+Use Phaser systems for:
+- game loop
+- input handling
+- timing/spawn system
+- tweens or sprite animations
+- particle effects if helpful
+- restart flow
+- HUD overlays
+
+Pseudo-3D implementation guidance
+Implement a custom pseudo-3D projection system inside Phaser.
+Suggested model:
+- each obstacle has a world depth value `z`
+- objects start far away and move toward the camera
+- project world x/z into screen x/y plus scale
+- use the projected scale to resize sprites or drawn objects
+- trail width should be computed by depth so it gets narrower in the distance
+- Dan should remain largely fixed in screen space while world elements approach
+
+You may implement this with:
+- sprites scaled by depth
+- graphics objects
+- generated textures
+- layered environment elements
+
+Do not use WebGL-specific advanced 3D engines.
+Do not use Three.js.
+Keep it in Phaser with pseudo-3D math.
+
+Architecture expectations
+Write the code cleanly and organize it into understandable systems.
+
+Implement classes or clear object structures for:
+- Player / Dan
+- TrailRenderer
+- ObstacleManager
+- Obstacle base class
+- Snake obstacle
+- Stream obstacle
+- Runner obstacle
+- Soda can obstacle
+- HUD / UI
+- Game state manager if useful
+
+Systems that must exist
+- forward movement simulation
+- mouse steering
+- click jump
+- jump physics
+- fall animation
+- obstacle spawning and despawning
+- collision detection
+- score tracking
+- progress toward finish
+- win/lose states
+- restart logic
+
+Input requirements
+Mouse movement:
+- Dan shifts left/right based on mouse x relative to game width
+
+Mouse click:
+- Dan jumps if on ground
+- ignore repeated jump spamming while airborne
+
+Optional:
+- touch support for mobile if straightforward
+But prioritize desktop browser playability first.
+
+UI / overlays
+Include:
+- title screen or intro overlay
+- short instruction text:
+  - move mouse to steer
+  - click to jump
+- in-game score
+- distance/progress to trailhead
+- game over overlay
+- win overlay
+- restart button
+
+Polish ideas to include if possible
+- dust puff when Dan lands
+- subtle camera bob while running
+- tree layers or parallax
+- snake wiggle/slither animation
+- slight spawn balancing by distance
+- small difficulty increase near trail end
+- forest ambience visuals
+- shadow scaling with jumps
+- squash/stretch in Dan’s movement
+
+Asset strategy
+If local art assets are not provided:
+- generate placeholder textures with Phaser graphics
+- create simple but polished cartoon-style shapes for Dan, runners, trees, cans, snakes, and streams
+- avoid ugly raw rectangles if possible
+- aim for something readable and charming
+
+Code quality
+- Produce a complete first playable version
+- Do not leave major TODOs
+- Include comments explaining the pseudo-3D projection math
+- Make restart work fully
+- Tune spawn rates so the game is challenging but fair
+- Other runners should be noticeably less frequent than obstacles
+- Avoid overengineering
+
+Deliverables
+Provide all necessary files and code for a complete working project.
+
+At minimum:
+- `index.html`
+- `style.css`
+- `main.js`
+
+If using more files, include them all and wire them correctly.
+
+Also include a short README section with:
+- how to run locally
+- file structure
+- controls
+- where to tune difficulty, speed, and spawn frequency
+
+Success criteria
+The final result should feel like:
+- a real trail-running arcade game
+- Dan is animated and centered near the bottom
+- the trail extends into the distance in perspective
+- hazards approach from the horizon
+- the player steers with the mouse
+- clicking jumps
+- collisions trigger Dan falling plus `GAME OVER` and `ahhhhhh!`
+- reaching the end triggers a win at the Atlanta loop trailhead
+
+Here’s a strong finishing add-on to paste after it, which usually helps Cursor avoid making it too bare-bones:
+
+Important final instruction:
+Do not build a minimal prototype. Build a polished first playable version with satisfying movement, readable pseudo-3D depth, animated character behavior, balanced obstacle spawning, and a pleasant cartoon game look.
+
+And here’s an even more opinionated version you can append if you want Cursor to structure it better:
+
+Implementation preference:
+Use Phaser scene architecture and create small reusable classes. Prefer generated textures and canvas-style art over missing external assets. Make the pseudo-3D effect the heart of the implementation.
+
+One practical note: if Cursor struggles with “realistic cartoon” art in pure code, a smart fallback is to have it create clean procedural graphics first, then later swap in better sprite assets.
