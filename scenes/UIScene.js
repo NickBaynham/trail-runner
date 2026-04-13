@@ -59,7 +59,8 @@ var UIScene = new Phaser.Class({
 
     this.startBtn.on("pointerdown", function () {
       this.hideTitle();
-      this.scene.get("GameScene").events.emit("beginRun");
+      var g = this.getGameScene();
+      if (g) g.events.emit("beginRun");
     }, this);
 
     var hudDepth = 8500;
@@ -128,6 +129,8 @@ var UIScene = new Phaser.Class({
       this.hudBg.setVisible(false);
       this.scoreTxt.setVisible(false);
       this.progTxt.setVisible(false);
+      var gs = this.getGameScene();
+      if (gs && gs.hideGameHud) gs.hideGameHud();
     }, this);
 
     this.scene.bringToTop();
@@ -139,9 +142,14 @@ var UIScene = new Phaser.Class({
     this.input.on("pointerdown", this.forwardJumpIfPlaying, this);
   },
 
+  /** After stop/start GameScene, prefer getScene(key) so we always get the current instance. */
+  getGameScene: function () {
+    return this.scene.getScene("GameScene") || this.scene.get("GameScene");
+  },
+
   forwardJumpIfPlaying: function (pointer) {
     if (this.overlayBg.visible) return;
-    var gs = this.scene.get("GameScene");
+    var gs = this.getGameScene();
     if (!gs || !gs.registry.get("running")) return;
     if (gs.gameOver || gs.won) return;
     gs.dan.setInput(pointer.x, gs.scale.width, true);
@@ -223,18 +231,26 @@ var UIScene = new Phaser.Class({
     this.titleGroup.forEach(function (o) {
       o.setVisible(false);
     });
-    this.hudBg.setVisible(true);
-    this.scoreTxt.setVisible(true);
-    this.progTxt.setVisible(true);
-  },
-
-  showTitleAgain: function () {
-    this.titleGroup.forEach(function (o) {
-      o.setVisible(true);
-    });
+    this.overlayBg.disableInteractive();
+    this.startBtn.disableInteractive();
+    /* Score / trail HUD lives on GameScene (scrollFactor 0) so it always composites. */
     this.hudBg.setVisible(false);
     this.scoreTxt.setVisible(false);
     this.progTxt.setVisible(false);
+  },
+
+  showTitleAgain: function () {
+    this.clearDeathFlash();
+    this.titleGroup.forEach(function (o) {
+      o.setVisible(true);
+    });
+    this.overlayBg.setInteractive();
+    this.startBtn.setInteractive({ useHandCursor: true });
+    this.hudBg.setVisible(false);
+    this.scoreTxt.setVisible(false);
+    this.progTxt.setVisible(false);
+    var gs = this.getGameScene();
+    if (gs && gs.hideGameHud) gs.hideGameHud();
   },
 
   hideGameOver: function () {
@@ -293,6 +309,7 @@ var UIScene = new Phaser.Class({
 
     var self = this;
     btn.on("pointerdown", function () {
+      self.clearDeathFlash();
       self.hideGameOver();
       self.scene.stop("GameScene");
       self.scene.start("GameScene");
@@ -337,6 +354,7 @@ var UIScene = new Phaser.Class({
 
     var self = this;
     btn.on("pointerdown", function () {
+      self.clearDeathFlash();
       self.hideWin();
       self.scene.stop("GameScene");
       self.scene.start("GameScene");

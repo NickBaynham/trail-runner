@@ -8,11 +8,11 @@ var GameScene = new Phaser.Class({
   },
 
   create: function () {
-    this.events.off("scoreAdd");
-    this.events.off("playerHit");
-    this.events.off("beginRun");
-    this.events.off("danLand");
-    this.input.off("pointerdown");
+    this.events.off("scoreAdd", this.onScoreAdd, this);
+    this.events.off("playerHit", this.onPlayerHit, this);
+    this.events.off("beginRun", this.resetRun, this);
+    this.events.off("danLand", this.onDanLand, this);
+    this.input.off("pointerdown", this.onPointerDown, this);
 
     this.W = this.scale.width;
     this.H = this.scale.height;
@@ -23,6 +23,8 @@ var GameScene = new Phaser.Class({
     this.won = false;
 
     this.registry.set("running", false);
+    this.registry.set("score", 0);
+    this.cameras.main.setScroll(0, 0);
 
     this.trail = new TrailRenderer(this);
     this.obstacleManager = new ObstacleManager(this, this.W, this.H);
@@ -45,6 +47,35 @@ var GameScene = new Phaser.Class({
     });
     this.dustEmitter.setDepth(3600);
 
+    var hudD = 100000;
+    this.hudBg = this.add
+      .rectangle(156, 54, 280, 78, 0x0d160f, 0.92)
+      .setStrokeStyle(2, 0x4caf50, 0.9)
+      .setScrollFactor(0)
+      .setDepth(hudD)
+      .setVisible(false);
+    this.hudScore = this.add
+      .text(28, 26, "Score: 0", {
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        fontSize: "24px",
+        color: "#f1f8e9",
+        fontStyle: "bold",
+      })
+      .setScrollFactor(0)
+      .setDepth(hudD + 1)
+      .setStroke("#0d160f", 6)
+      .setVisible(false);
+    this.hudProg = this.add
+      .text(28, 58, "Trail: 0%", {
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        fontSize: "18px",
+        color: "#c8e6c9",
+      })
+      .setScrollFactor(0)
+      .setDepth(hudD + 1)
+      .setStroke("#0d160f", 5)
+      .setVisible(false);
+
     this.events.on("scoreAdd", this.onScoreAdd, this);
     this.events.on("playerHit", this.onPlayerHit, this);
     this.events.on("beginRun", this.resetRun, this);
@@ -52,9 +83,35 @@ var GameScene = new Phaser.Class({
 
     this.input.on("pointerdown", this.onPointerDown, this);
 
-    var ui = this.scene.get("UIScene");
+    var ui = this.scene.get("UIScene") || this.scene.getScene("UIScene");
     if (ui) {
       ui.events.emit("fullResetToTitle");
+    }
+  },
+
+  shutdown: function () {
+    this.events.off("scoreAdd", this.onScoreAdd, this);
+    this.events.off("playerHit", this.onPlayerHit, this);
+    this.events.off("beginRun", this.resetRun, this);
+    this.events.off("danLand", this.onDanLand, this);
+    this.input.off("pointerdown", this.onPointerDown, this);
+  },
+
+  hideGameHud: function () {
+    if (this.hudBg) this.hudBg.setVisible(false);
+    if (this.hudScore) this.hudScore.setVisible(false);
+    if (this.hudProg) this.hudProg.setVisible(false);
+  },
+
+  showGameHud: function () {
+    if (this.hudBg) this.hudBg.setVisible(true);
+    if (this.hudScore) {
+      this.hudScore.setVisible(true);
+      this.hudScore.setText("Score: " + this.registry.get("score"));
+    }
+    if (this.hudProg) {
+      this.hudProg.setVisible(true);
+      this.hudProg.setText("Trail: 0%");
     }
   },
 
@@ -67,14 +124,16 @@ var GameScene = new Phaser.Class({
     this.obstacleManager.reset();
     this.dan.reset(this.W * 0.5, this.H * 0.88);
     this.registry.set("running", true);
-    var ui = this.scene.get("UIScene");
+    this.showGameHud();
+    var ui = this.scene.get("UIScene") || this.scene.getScene("UIScene");
     if (ui) ui.events.emit("resetHud");
   },
 
   onScoreAdd: function (pts) {
     var s = this.registry.get("score") + pts;
     this.registry.set("score", s);
-    var ui = this.scene.get("UIScene");
+    if (this.hudScore) this.hudScore.setText("Score: " + s);
+    var ui = this.scene.get("UIScene") || this.scene.getScene("UIScene");
     if (ui) ui.events.emit("scoreChanged", s);
   },
 
@@ -86,8 +145,12 @@ var GameScene = new Phaser.Class({
     this.gameOver = true;
     this.registry.set("running", false);
     this.dan.triggerFall();
-    var ui = this.scene.get("UIScene");
+    var ui = this._getUiScene();
     if (ui) ui.events.emit("playerDeath", this.registry.get("score"), reason || "hazard");
+  },
+
+  _getUiScene: function () {
+    return this.scene.get("UIScene") || this.scene.getScene("UIScene");
   },
 
   onDanLand: function () {
@@ -113,7 +176,12 @@ var GameScene = new Phaser.Class({
       return;
     }
 
-    if (this.gameOver || this.won) return;
+    if (this.gameOver || this.won) {
+      this.trail.draw(this.playerZ, this.runSpeed || 118);
+      this.obstacleManager.drawObstacles(this.playerZ, this.dan.lane, time);
+      this.dan.update(time, delta, this.runSpeed || 118);
+      return;
+    }
 
     this.playerZ += this.runSpeed * dt;
 
@@ -147,7 +215,8 @@ var GameScene = new Phaser.Class({
     if (this.playerZ >= this.obstacleManager.TOTAL_TRAIL) {
       this.won = true;
       this.registry.set("running", false);
-      var ui = this.scene.get("UIScene");
+      if (this.hudProg) this.hudProg.setText("Trail: 100%");
+      var ui = this._getUiScene();
       if (ui) {
         ui.events.emit("progressChanged", 100);
         ui.events.emit("showWin", this.registry.get("score"));
@@ -159,7 +228,8 @@ var GameScene = new Phaser.Class({
     this.obstacleManager.drawObstacles(this.playerZ, this.dan.lane, time);
 
     var prog = Math.floor((this.playerZ / this.obstacleManager.TOTAL_TRAIL) * 100);
-    var ui = this.scene.get("UIScene");
+    if (this.hudProg) this.hudProg.setText("Trail: " + Phaser.Math.Clamp(prog, 0, 100) + "%");
+    var ui = this._getUiScene();
     if (ui) ui.events.emit("progressChanged", prog);
   },
 });
