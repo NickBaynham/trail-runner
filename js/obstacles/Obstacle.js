@@ -20,6 +20,6 @@ Obstacle.prototype.getLane = function (_time) {
   return this.lane;
 };
 
-Obstacle.prototype.update = function (time, delta, runSpeed) {};
+Obstacle.prototype.update = function (_time, _delta, _runSpeed) {};
 
 Obstacle.prototype.destroy = function () {};

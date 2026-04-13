@@ -216,10 +216,10 @@ var GameScene = new Phaser.Class({
       this.won = true;
       this.registry.set("running", false);
       if (this.hudProg) this.hudProg.setText("Trail: 100%");
-      var ui = this._getUiScene();
-      if (ui) {
-        ui.events.emit("progressChanged", 100);
-        ui.events.emit("showWin", this.registry.get("score"));
+      var uiWin = this._getUiScene();
+      if (uiWin) {
+        uiWin.events.emit("progressChanged", 100);
+        uiWin.events.emit("showWin", this.registry.get("score"));
       }
       return;
     }

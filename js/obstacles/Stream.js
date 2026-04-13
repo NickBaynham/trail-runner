@@ -8,6 +8,6 @@ function Stream(scene, lane, worldZ) {
 Stream.prototype = Object.create(Obstacle.prototype);
 Stream.prototype.constructor = Stream;
 
-Stream.prototype.getLane = function (time) {
+Stream.prototype.getLane = function (_time) {
   return 0;
 };

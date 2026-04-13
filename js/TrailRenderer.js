@@ -7,7 +7,7 @@ function TrailRenderer(scene) {
   this.g.setDepth(5);
 }
 
-TrailRenderer.prototype.draw = function (playerProgress, runSpeed) {
+TrailRenderer.prototype.draw = function (playerProgress, _runSpeed) {
   var w = this.scene.scale.width;
   var h = this.scene.scale.height;
   this.g.clear();
