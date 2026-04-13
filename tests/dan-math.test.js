@@ -33,4 +33,14 @@ describe("DanMath", () => {
     expect(j.x).toBeLessThan(40);
     expect(Math.abs(j.y)).toBeLessThan(30);
   });
+
+  it("ik2PickOutward keeps left knee to the left of hip for a forward foot", () => {
+    var DanMath = loadDanMath();
+    var hipX = 0;
+    var hipY = 40;
+    var footX = -8;
+    var footY = 62;
+    var k = DanMath.ik2PickOutward(hipX, hipY, footX, footY, 42, 40, true);
+    expect(k.x).toBeLessThanOrEqual(hipX + 2);
+  });
 });

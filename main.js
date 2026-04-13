@@ -1,5 +1,5 @@
 /**
- * Phaser 3 entry — pseudo-3D trail runner (Atlanta loop).
+ * Phaser 3 entry — Baby Bouncing Dan: Extreme Trail Runner (Atlanta loop).
  */
 var config = {
   type: Phaser.AUTO,
@@ -20,3 +20,5 @@ var config = {
 };
 
 var game = new Phaser.Game(config);
+/** Playwright / devtools: read GameScene state while running. */
+window.__trailRunnerGame = game;

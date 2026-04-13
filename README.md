@@ -1,6 +1,6 @@
-# Extreme Trail Runner (Phaser 3)
+# Baby Bouncing Dan: Extreme Trail Runner (Phaser 3)
 
-Browser-based **pseudo-3D trail running** game: steer **Dan** with the mouse, **click to jump**, reach the **Atlanta loop trailhead** on a fixed course.
+Browser-based **pseudo-3D trail running** game: steer **Dan** with the mouse, **click to jump**, reach the **Atlanta loop trailhead** on a fixed course. The header logo uses the same **bouncing** timing as Dan’s idle jog on the title screen.
 
 ## Run locally
 

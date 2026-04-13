@@ -47,7 +47,8 @@ var GameScene = new Phaser.Class({
     });
     this.dustEmitter.setDepth(3600);
 
-    var hudD = 100000;
+    /** Keep HUD above world (Dan ~2800, hazards < 3400) but avoid extreme depths for GPU sort. */
+    var hudD = 12000;
     this.hudBg = this.add
       .rectangle(156, 54, 280, 78, 0x0d160f, 0.92)
       .setStrokeStyle(2, 0x4caf50, 0.9)

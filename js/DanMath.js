@@ -60,6 +60,19 @@ var DanMath = {
     };
   },
 
+  /**
+   * Same as ik2 but chooses +1 / -1 so the joint sits on the body exterior in rear view:
+   * left limb bends outward (-X), right limb outward (+X). Stops knees/elbows folding through the torso.
+   */
+  ik2PickOutward: function (rootX, rootY, endX, endY, len1, len2, isLeftLimb) {
+    var kPos = DanMath.ik2(rootX, rootY, endX, endY, len1, len2, 1);
+    var kNeg = DanMath.ik2(rootX, rootY, endX, endY, len1, len2, -1);
+    var side = isLeftLimb ? -1 : 1;
+    var sPos = (kPos.x - rootX) * side;
+    var sNeg = (kNeg.x - rootX) * side;
+    return sPos >= sNeg ? kPos : kNeg;
+  },
+
   smooth: function (t) {
     t = DanMath.clamp(t, 0, 1);
     return t * t * (3 - 2 * t);

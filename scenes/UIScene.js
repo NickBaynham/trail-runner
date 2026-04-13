@@ -11,19 +11,21 @@ var UIScene = new Phaser.Class({
     var w = this.scale.width;
     var h = this.scale.height;
 
-    /** Transparent clear so GameScene stays visible underneath this overlay scene. */
-    this.cameras.main.setBackgroundColor("rgba(0,0,0,0)");
+    /** Transparent clear so GameScene can show through when this scene is on top. */
+    this.cameras.main.setBackgroundColor({ r: 0, g: 0, b: 0, a: 0 });
+    this.cameras.main.transparent = true;
 
     this.overlayBg = this.add.rectangle(w / 2, h / 2, w, h, 0x1a2f1e, 0.92);
     this.overlayBg.setDepth(10000);
     this.overlayBg.setInteractive();
 
     var title = this.add
-      .text(w / 2, h * 0.28, "Extreme Trail Runner", {
+      .text(w / 2, h * 0.26, "Baby Bouncing Dan\nExtreme Trail Runner", {
         fontFamily: "Segoe UI, system-ui, sans-serif",
-        fontSize: "38px",
+        fontSize: "34px",
         color: "#7cfc8a",
         fontStyle: "bold",
+        align: "center",
       })
       .setOrigin(0.5)
       .setDepth(10001);
@@ -31,8 +33,8 @@ var UIScene = new Phaser.Class({
     var sub = this.add
       .text(
         w / 2,
-        h * 0.38,
-        "Guide Dan to the Atlanta loop trailhead.\n\n• Move mouse left/right to steer\n• Click to jump streams & hazards",
+        h * 0.4,
+        "Same bounce as the header logo — boop Dan to the Atlanta loop trailhead.\n\n• Move mouse left/right to steer\n• Click to jump streams & hazards",
         {
           fontFamily: "Segoe UI, system-ui, sans-serif",
           fontSize: "18px",
@@ -134,25 +136,11 @@ var UIScene = new Phaser.Class({
     }, this);
 
     this.scene.bringToTop();
-
-    /**
-     * UIScene is on top of GameScene, so pointer events often never reach GameScene.
-     * Forward clicks as jump while a run is active (title / modals skip).
-     */
-    this.input.on("pointerdown", this.forwardJumpIfPlaying, this);
   },
 
   /** After stop/start GameScene, prefer getScene(key) so we always get the current instance. */
   getGameScene: function () {
     return this.scene.getScene("GameScene") || this.scene.get("GameScene");
-  },
-
-  forwardJumpIfPlaying: function (pointer) {
-    if (this.overlayBg.visible) return;
-    var gs = this.getGameScene();
-    if (!gs || !gs.registry.get("running")) return;
-    if (gs.gameOver || gs.won) return;
-    gs.dan.setInput(pointer.x, gs.scale.width, true);
   },
 
   clearDeathFlash: function () {
@@ -182,6 +170,9 @@ var UIScene = new Phaser.Class({
   flashHitThenGameOver: function (score, reason) {
     var self = this;
     this.clearDeathFlash();
+    this.sys.setVisible(true);
+    this.input.enabled = true;
+    this.scene.bringToTop();
 
     var w = this.scale.width;
     var h = this.scale.height;
@@ -237,9 +228,18 @@ var UIScene = new Phaser.Class({
     this.hudBg.setVisible(false);
     this.scoreTxt.setVisible(false);
     this.progTxt.setVisible(false);
+    /**
+     * Stop rendering this scene during a run so it cannot sit on top of GameScene in the
+     * compositor (sendToBack alone is not always enough). Updates and events still run.
+     */
+    this.sys.setVisible(false);
+    this.input.enabled = false;
   },
 
   showTitleAgain: function () {
+    this.sys.setVisible(true);
+    this.input.enabled = true;
+    this.scene.bringToTop();
     this.clearDeathFlash();
     this.titleGroup.forEach(function (o) {
       o.setVisible(true);
@@ -269,6 +269,9 @@ var UIScene = new Phaser.Class({
 
   showGameOver: function (score) {
     this.clearDeathFlash();
+    this.sys.setVisible(true);
+    this.input.enabled = true;
+    this.scene.bringToTop();
     var w = this.scale.width;
     var h = this.scale.height;
     this.hideGameOver();
@@ -322,12 +325,15 @@ var UIScene = new Phaser.Class({
   },
 
   showWin: function (score) {
+    this.sys.setVisible(true);
+    this.input.enabled = true;
+    this.scene.bringToTop();
     var w = this.scale.width;
     var h = this.scale.height;
     this.hideWin();
     var bg = this.add.rectangle(w / 2, h / 2, w * 0.78, h * 0.55, 0x1b5e20, 0.94).setDepth(11000);
     var t = this.add
-      .text(w / 2, h * 0.36, "Dan reached the\nAtlanta loop trailhead!", {
+      .text(w / 2, h * 0.36, "Baby Dan bounced to the\nAtlanta loop trailhead!", {
         fontSize: "30px",
         color: "#c8e6c9",
         align: "center",
