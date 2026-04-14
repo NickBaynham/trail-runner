@@ -6,6 +6,16 @@
 
 /* global DanMath, TrailProjection */
 
+function danSceneRegistry(scene) {
+  return scene.game && scene.game.registry ? scene.game.registry : scene.registry;
+}
+
+function isTrailRunActive(scene) {
+  if (typeof scene.runActive === "boolean") return scene.runActive;
+  var reg = danSceneRegistry(scene);
+  return !!(reg && reg.get("running"));
+}
+
 /** Logo SVG viewBox 0 0 56 72 — numeric constants for proportions. */
 var LOGO_SVG = {
   vbW: 56,
@@ -236,7 +246,7 @@ function DanCharacter(scene, x, y) {
   this.fallTime = 0;
   this.steerTilt = 0;
 
-  this.STATE = { RUN: "run", JUMP: "jump", PREJUMP: "prejump", FALL: "fall" };
+  this.STATE = { RUN: "run", JUMP: "jump", FALL: "fall" };
   this.animState = this.STATE.RUN;
 
   this.poseRig = new LogoDanPose();
@@ -294,14 +304,6 @@ DanCharacter.prototype._redraw = function (time, _delta) {
     return;
   }
 
-  if (this.animState === this.STATE.PREJUMP) {
-    pose = this.poseRig.compute(this.runPhase, 118, 0, 1, this.jumpSquat, false, 0);
-    this.bodyRoot.setScale(pose.squashX, pose.squashY);
-    this.bodyRoot.setY(pose.bodyY);
-    this._renderer.draw(pose, true);
-    return;
-  }
-
   this.animState = this.STATE.RUN;
   pose = this.poseRig.compute(
     this.runPhase,
@@ -322,36 +324,20 @@ DanCharacter.prototype._redraw = function (time, _delta) {
     this.bodyRoot.setY(pose.bodyY);
   }
 
-  var registryRun = this.scene.registry && this.scene.registry.get("running");
+  var registryRun = isTrailRunActive(this.scene);
   this._renderer.draw(pose, registryRun);
 };
 
 DanCharacter.prototype.setInput = function (pointerX, gameWidth, jumpRequested) {
-  var nx = pointerX / gameWidth;
+  var gw = gameWidth > 0 ? gameWidth : 1;
+  var nx = pointerX / gw;
   this.targetLane = Phaser.Math.Clamp(nx * 2 - 1, -0.92, 0.92);
 
-  if (jumpRequested && this.isGrounded && !this.fallen && this.animState !== this.STATE.PREJUMP) {
-    this.animState = this.STATE.PREJUMP;
+  if (jumpRequested && this.isGrounded && !this.fallen) {
     this.jumpSquat = 0;
-
-    var self = this;
-    this.scene.tweens.add({
-      targets: this,
-      jumpSquat: 1,
-      duration: 60,
-      ease: "Sine.easeIn",
-      onComplete: function () {
-        if (!self.fallen && self.isGrounded) {
-          self.jumpVel = self.jumpPower;
-          self.isGrounded = false;
-          self.animState = self.STATE.JUMP;
-          self.jumpSquat = 0;
-        } else {
-          self.jumpSquat = 0;
-          self.animState = self.STATE.RUN;
-        }
-      },
-    });
+    this.jumpVel = this.jumpPower;
+    this.isGrounded = false;
+    this.animState = this.STATE.JUMP;
     return true;
   }
 
@@ -369,6 +355,7 @@ DanCharacter.prototype.update = function (time, delta, runSpeed) {
 
   var dt = delta / 1000;
   this.lane += (this.targetLane - this.lane) * Math.min(1, this.laneSmooth * dt);
+  this.lane = Phaser.Math.Clamp(this.lane, -0.92, 0.92);
 
   var w = this.scene.scale.width;
   var h = this.scene.scale.height;
@@ -404,8 +391,8 @@ DanCharacter.prototype.update = function (time, delta, runSpeed) {
     }
   }
 
-  var registryRun = this.scene.registry && this.scene.registry.get("running");
-  if (this.isGrounded && (this.animState === this.STATE.RUN || this.animState === this.STATE.PREJUMP)) {
+  var registryRun = isTrailRunActive(this.scene);
+  if (this.isGrounded && this.animState === this.STATE.RUN) {
     if (registryRun) {
       var bouncePeriodMs = Math.max(260, 420 - DanMath.clamp(rs - 118, 0, 100) * 1.35);
       this.runPhase += delta * ((Math.PI * 2) / bouncePeriodMs);

@@ -7,7 +7,8 @@ function ObstacleManager(scene, gameW, gameH) {
   this.gameH = gameH;
   this.list = [];
   this.nextSpawnZ = 220;
-  this.rng = new Phaser.Math.RandomDataGenerator(["trail", "42"]);
+  /** Real seed applied in reset() each run so layouts and scores are not identical every play. */
+  this.rng = new Phaser.Math.RandomDataGenerator(["trail", "0"]);
 
   /** Trail length in world Z (~30–45 s at starting run speed). */
   this.TOTAL_TRAIL = 3800;
@@ -16,7 +17,13 @@ function ObstacleManager(scene, gameW, gameH) {
 
 ObstacleManager.prototype.reset = function () {
   this.list = [];
-  this.nextSpawnZ = 72;
+  /** First hazard well ahead so the player can move off center after clicking Start. */
+  this.nextSpawnZ = 320;
+  this.rng = new Phaser.Math.RandomDataGenerator([
+    "trail",
+    String(Date.now()),
+    String(Math.random()),
+  ]);
   this.graphicsByOb.forEach(function (g) {
     g.destroy();
   });
@@ -30,7 +37,8 @@ ObstacleManager.prototype.reset = function () {
 ObstacleManager.prototype.scheduleSpawn = function (playerZ) {
   var endZone = this.TOTAL_TRAIL - 450;
   var horizon = playerZ + TrailProjection.Z_FAR;
-  var maxPerTick = 2;
+  var playerT = Phaser.Math.Clamp(playerZ / this.TOTAL_TRAIL, 0, 1);
+  var maxPerTick = playerT > 0.55 ? 3 : playerT < 0.16 ? 1 : 2;
   var spawned = 0;
 
   while (
@@ -38,27 +46,41 @@ ObstacleManager.prototype.scheduleSpawn = function (playerZ) {
     this.nextSpawnZ <= endZone &&
     horizon >= this.nextSpawnZ
   ) {
-    var difficulty = Phaser.Math.Clamp(this.nextSpawnZ / this.TOTAL_TRAIL, 0, 1);
-    var gap = Phaser.Math.Linear(94, 54, difficulty);
-    var jitter = this.rng.realInRange(-5, 9);
+    var t = Phaser.Math.Clamp(this.nextSpawnZ / this.TOTAL_TRAIL, 0, 1);
+    /** Wider gaps early; denser late. */
+    var gap = Phaser.Math.Linear(138, 52, t);
+    var jitter = this.rng.realInRange(-10, 12);
     var roll = this.rng.frac();
     var lane = this.rng.realInRange(-0.65, 0.65);
     var z = this.nextSpawnZ;
 
-    if (roll < 0.06 && z > 400 && z < endZone - 280) {
-      this.list.push(new Stream(this.scene, 0, z));
-    } else if (roll < 0.38) {
-      this.list.push(new SodaCan(this.scene, lane, z));
-    } else if (roll < 0.64) {
-      this.list.push(new Snake(this.scene, lane, z));
-    } else if (roll < 0.86 && z > 100) {
+    var streamTh = Phaser.Math.Linear(0.06, 0.13, t);
+    /** Fewer cans/snakes early; more other runners overall. */
+    var sodaBand = Phaser.Math.Linear(0.17, 0.24, t);
+    var snakeBand = Phaser.Math.Linear(0.11, 0.28, t);
+    var runnerBand = Phaser.Math.Linear(0.52, 0.3, t);
+    var rStream = streamTh;
+    var rSoda = rStream + sodaBand;
+    var rSnake = rSoda + snakeBand;
+    var rRunner = rSnake + runnerBand;
+
+    if (roll < rStream && z > 400 && z < endZone - 280) {
+      this.list.push(new Stream(this.scene, 0, z, t));
+    } else if (roll < rSoda) {
+      this.list.push(new SodaCan(this.scene, lane, z, t));
+    } else if (roll < rSnake) {
+      this.list.push(new Snake(this.scene, lane, z, t));
+    } else if (roll < rRunner && z > 100) {
       var away = this.rng.frac() > 0.42;
-      this.list.push(new RunnerNpc(this.scene, lane, z, away));
+      this.list.push(new RunnerNpc(this.scene, lane, z, away, t));
+    } else if (z > 120 && this.rng.frac() < 0.62) {
+      var away2 = this.rng.frac() > 0.45;
+      this.list.push(new RunnerNpc(this.scene, lane + this.rng.realInRange(-0.18, 0.18), z, away2, t));
     } else {
-      this.list.push(new SodaCan(this.scene, lane + this.rng.realInRange(-0.2, 0.2), z));
+      this.list.push(new SodaCan(this.scene, lane + this.rng.realInRange(-0.2, 0.2), z, t));
     }
 
-    this.nextSpawnZ += Math.max(52, gap + jitter);
+    this.nextSpawnZ += Math.max(56, gap + jitter);
     spawned++;
   }
 };
@@ -77,7 +99,7 @@ ObstacleManager.prototype.update = function (time, delta, playerZ, playerLane, r
     if (depth < -90) {
       if (!o.scored && o.type !== "stream") {
         o.scored = true;
-        this.scene.events.emit("scoreAdd", o.type === "runner" ? 25 : 14);
+        this.scene.events.emit("scoreAdd", o.type === "runner" ? 32 : 20);
       }
       this.removeOb(i);
       continue;
@@ -86,22 +108,34 @@ ObstacleManager.prototype.update = function (time, delta, playerZ, playerLane, r
     if (depth > TrailProjection.Z_FAR + 50) continue;
 
     var lane = o.getLane(time);
-    var hitD0 = o.type === "stream" ? 5 : 11;
-    var hitD1 = o.type === "stream" ? 36 : 27;
+    var hitD0;
+    var hitD1;
+    if (o.type === "stream") {
+      hitD0 = 5;
+      hitD1 = 36;
+    } else if (o.type === "soda" || o.type === "snake") {
+      hitD0 = 14;
+      hitD1 = 24;
+    } else {
+      hitD0 = 11;
+      hitD1 = 26;
+    }
+    var trailP = Phaser.Math.Clamp(o.worldZ / this.TOTAL_TRAIL, 0, 1);
+    var laneMargin = 0.042 + trailP * 0.038;
 
     if (depth > hitD0 && depth < hitD1) {
       if (o.type === "stream") {
         if (!jumpClear) {
           this.scene.events.emit("playerHit", "stream");
         }
-      } else if (Math.abs(playerLane - lane) < o.hitHalfWidth + 0.11) {
+      } else if (Math.abs(playerLane - lane) < o.hitHalfWidth + laneMargin) {
         this.scene.events.emit("playerHit", o.type);
       }
     }
 
     if (o.type === "stream" && jumpClear && depth > hitD0 && depth < hitD1 && !o.scored) {
       o.scored = true;
-      this.scene.events.emit("scoreAdd", 22);
+      this.scene.events.emit("scoreAdd", 28);
     }
   }
 };

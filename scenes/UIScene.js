@@ -62,7 +62,12 @@ var UIScene = new Phaser.Class({
     this.startBtn.on("pointerdown", function () {
       this.hideTitle();
       var g = this.getGameScene();
-      if (g) g.events.emit("beginRun");
+      /** Call resetRun directly so a run always starts even if Scene events are finicky. */
+      if (g && typeof g.resetRun === "function") {
+        g.resetRun();
+      } else if (g) {
+        g.events.emit("beginRun");
+      }
     }, this);
 
     var hudDepth = 8500;
@@ -70,6 +75,7 @@ var UIScene = new Phaser.Class({
       .rectangle(16 + 140, 16 + 38, 280, 78, 0x0d160f, 0.9)
       .setOrigin(0.5)
       .setStrokeStyle(2, 0x4caf50, 0.85)
+      .setScrollFactor(0)
       .setDepth(hudDepth)
       .setVisible(false);
 
@@ -80,6 +86,7 @@ var UIScene = new Phaser.Class({
         color: "#f1f8e9",
         fontStyle: "bold",
       })
+      .setScrollFactor(0)
       .setDepth(hudDepth + 1)
       .setStroke("#0d160f", 6)
       .setVisible(false);
@@ -90,6 +97,7 @@ var UIScene = new Phaser.Class({
         fontSize: "18px",
         color: "#c8e6c9",
       })
+      .setScrollFactor(0)
       .setDepth(hudDepth + 1)
       .setStroke("#0d160f", 5)
       .setVisible(false);
@@ -105,6 +113,9 @@ var UIScene = new Phaser.Class({
       this.progTxt.setText("Trail: 0%");
       this.hideGameOver();
       this.hideWin();
+      this.hudBg.setVisible(true);
+      this.scoreTxt.setVisible(true);
+      this.progTxt.setVisible(true);
     }, this);
 
     this.events.on("scoreChanged", function (s) {
@@ -115,12 +126,12 @@ var UIScene = new Phaser.Class({
       this.progTxt.setText("Trail: " + Phaser.Math.Clamp(p, 0, 100) + "%");
     }, this);
 
-    this.events.on("playerDeath", function (score, reason) {
-      this.flashHitThenGameOver(score, reason);
+    this.events.on("playerDeath", function (score, reason, trailPct) {
+      this.flashHitThenGameOver(score, reason, trailPct);
     }, this);
 
-    this.events.on("showWin", function (score) {
-      this.showWin(score);
+    this.events.on("showWin", function (score, trailPct) {
+      this.showWin(score, trailPct);
     }, this);
 
     this.events.on("fullResetToTitle", function () {
@@ -132,15 +143,61 @@ var UIScene = new Phaser.Class({
       this.scoreTxt.setVisible(false);
       this.progTxt.setVisible(false);
       var gs = this.getGameScene();
-      if (gs && gs.hideGameHud) gs.hideGameHud();
+      if (gs) {
+        gs.runActive = false;
+        if (gs._syncRunningRegistry) gs._syncRunningRegistry(false);
+        if (gs.hideGameHud) gs.hideGameHud();
+      }
     }, this);
 
     this.scene.bringToTop();
+
+    /**
+     * UIScene stacks above GameScene; clicks on empty space do not reach GameScene.
+     * Forward jump while a run is active (title overlay uses pointerdown on Start only).
+     */
+    this.input.on("pointerdown", this.forwardJumpIfPlaying, this);
   },
 
   /** After stop/start GameScene, prefer getScene(key) so we always get the current instance. */
   getGameScene: function () {
-    return this.scene.getScene("GameScene") || this.scene.get("GameScene");
+    var game = this.sys && this.sys.game;
+    var key = "GameScene";
+    if (game && game.scene && game.scene.getScene) {
+      var byGame = game.scene.getScene(key);
+      if (byGame) return byGame;
+    }
+    return this.scene.getScene(key) || this.scene.get(key);
+  },
+
+  /**
+   * Stop then start GameScene on the next frame so Phaser can tear the scene down cleanly (fixes Restart).
+   */
+  _deferRestartGameScene: function () {
+    var game = this.sys.game;
+    if (!game || !game.scene) return;
+    var scenePlugin = game.scene;
+    scenePlugin.stop("GameScene");
+    this.time.delayedCall(0, function () {
+      scenePlugin.start("GameScene");
+    });
+  },
+
+  forwardJumpIfPlaying: function (pointer) {
+    if (this.overlayBg.visible) return;
+    var gs = this.getGameScene();
+    if (!gs || !gs.runActive) return;
+    if (gs.gameOver || gs.won) return;
+    var game = this.sys.game;
+    var ap = game && game.input ? game.input.activePointer : null;
+    var px =
+      ap && typeof ap.x === "number" && !Number.isNaN(ap.x)
+        ? ap.x
+        : pointer && typeof pointer.x === "number"
+          ? pointer.x
+          : gs.scale.width * 0.5;
+    var gw = gs.scale && gs.scale.width > 0 ? gs.scale.width : gs.W || 960;
+    gs.dan.setInput(px, gw, true);
   },
 
   clearDeathFlash: function () {
@@ -167,9 +224,13 @@ var UIScene = new Phaser.Class({
     return m[reason] || m.hazard;
   },
 
-  flashHitThenGameOver: function (score, reason) {
+  flashHitThenGameOver: function (score, reason, trailPct) {
     var self = this;
+    var trail = typeof trailPct === "number" ? Phaser.Math.Clamp(trailPct, 0, 100) : 0;
     this.clearDeathFlash();
+    this.hudBg.setVisible(false);
+    this.scoreTxt.setVisible(false);
+    this.progTxt.setVisible(false);
     this.sys.setVisible(true);
     this.input.enabled = true;
     this.scene.bringToTop();
@@ -209,11 +270,11 @@ var UIScene = new Phaser.Class({
           duration: 240,
           onComplete: function () {
             self.clearDeathFlash();
-            self.showGameOver(score);
+            self.showGameOver(score, trail);
           },
         });
       } else {
-        self.showGameOver(score);
+        self.showGameOver(score, trail);
       }
     });
   },
@@ -224,16 +285,11 @@ var UIScene = new Phaser.Class({
     });
     this.overlayBg.disableInteractive();
     this.startBtn.disableInteractive();
-    /* Score / trail HUD lives on GameScene (scrollFactor 0) so it always composites. */
-    this.hudBg.setVisible(false);
-    this.scoreTxt.setVisible(false);
-    this.progTxt.setVisible(false);
-    /**
-     * Stop rendering this scene during a run so it cannot sit on top of GameScene in the
-     * compositor (sendToBack alone is not always enough). Updates and events still run.
-     */
-    this.sys.setVisible(false);
-    this.input.enabled = false;
+    /* Run HUD on this scene (pinned scrollFactor 0); GameScene hides its duplicate. */
+    this.hudBg.setVisible(true);
+    this.scoreTxt.setVisible(true);
+    this.progTxt.setVisible(true);
+    this.scene.bringToTop();
   },
 
   showTitleAgain: function () {
@@ -250,7 +306,11 @@ var UIScene = new Phaser.Class({
     this.scoreTxt.setVisible(false);
     this.progTxt.setVisible(false);
     var gs = this.getGameScene();
-    if (gs && gs.hideGameHud) gs.hideGameHud();
+    if (gs) {
+      gs.runActive = false;
+      if (gs._syncRunningRegistry) gs._syncRunningRegistry(false);
+      if (gs.hideGameHud) gs.hideGameHud();
+    }
   },
 
   hideGameOver: function () {
@@ -267,8 +327,11 @@ var UIScene = new Phaser.Class({
     this.winGroup = [];
   },
 
-  showGameOver: function (score) {
+  showGameOver: function (score, trailPct) {
     this.clearDeathFlash();
+    this.hudBg.setVisible(false);
+    this.scoreTxt.setVisible(false);
+    this.progTxt.setVisible(false);
     this.sys.setVisible(true);
     this.input.enabled = true;
     this.scene.bringToTop();
@@ -292,15 +355,17 @@ var UIScene = new Phaser.Class({
       })
       .setOrigin(0.5)
       .setDepth(11001);
+    var tp = typeof trailPct === "number" ? Phaser.Math.Clamp(trailPct, 0, 100) : 0;
     var sc = this.add
-      .text(w / 2, h * 0.56, "Final score: " + score, {
-        fontSize: "24px",
+      .text(w / 2, h * 0.54, "Final score: " + score + "\nTrail completed: " + tp + "%", {
+        fontSize: "22px",
         color: "#ffffff",
+        align: "center",
       })
       .setOrigin(0.5)
       .setDepth(11001);
     var btn = this.add
-      .text(w / 2, h * 0.68, "Restart", {
+      .text(w / 2, h * 0.7, "Restart", {
         fontSize: "24px",
         color: "#fff",
         backgroundColor: "#c62828",
@@ -314,17 +379,19 @@ var UIScene = new Phaser.Class({
     btn.on("pointerdown", function () {
       self.clearDeathFlash();
       self.hideGameOver();
-      self.scene.stop("GameScene");
-      self.scene.start("GameScene");
       self.scoreTxt.setText("Score: 0");
       self.progTxt.setText("Trail: 0%");
       self.showTitleAgain();
+      self._deferRestartGameScene();
     });
 
     this.gameOverGroup = [bg, t, cap, sc, btn];
   },
 
-  showWin: function (score) {
+  showWin: function (score, trailPct) {
+    this.hudBg.setVisible(false);
+    this.scoreTxt.setVisible(false);
+    this.progTxt.setVisible(false);
     this.sys.setVisible(true);
     this.input.enabled = true;
     this.scene.bringToTop();
@@ -340,10 +407,12 @@ var UIScene = new Phaser.Class({
       })
       .setOrigin(0.5)
       .setDepth(11001);
+    var tp = typeof trailPct === "number" ? Phaser.Math.Clamp(trailPct, 0, 100) : 100;
     var sc = this.add
-      .text(w / 2, h * 0.52, "Final score: " + score, {
+      .text(w / 2, h * 0.5, "Final score: " + score + "\nTrail completed: " + tp + "%", {
         fontSize: "26px",
         color: "#ffffff",
+        align: "center",
       })
       .setOrigin(0.5)
       .setDepth(11001);
@@ -362,11 +431,10 @@ var UIScene = new Phaser.Class({
     btn.on("pointerdown", function () {
       self.clearDeathFlash();
       self.hideWin();
-      self.scene.stop("GameScene");
-      self.scene.start("GameScene");
       self.scoreTxt.setText("Score: 0");
       self.progTxt.setText("Trail: 0%");
       self.showTitleAgain();
+      self._deferRestartGameScene();
     });
 
     this.winGroup = [bg, t, sc, btn];

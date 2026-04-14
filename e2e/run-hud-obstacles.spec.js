@@ -20,7 +20,7 @@ test("start run shows score HUD and spawns obstacles", async ({ page }) => {
     var ui = game.scene.getScene("UIScene");
     var gs = game.scene.getScene("GameScene");
     ui.hideTitle();
-    gs.events.emit("beginRun");
+    gs.resetRun();
   });
 
   await page.waitForFunction(
@@ -28,8 +28,9 @@ test("start run shows score HUD and spawns obstacles", async ({ page }) => {
       var game = window.__trailRunnerGame;
       if (!game || !game.scene) return false;
       var g = game.scene.getScene("GameScene");
-      if (!g || !g.registry.get("running")) return false;
-      if (!g.hudScore || !g.hudScore.visible) return false;
+      var ui = game.scene.getScene("UIScene");
+      if (!g || !ui || !g.runActive) return false;
+      if (!ui.scoreTxt || !ui.scoreTxt.visible || !ui.progTxt.visible) return false;
       return g.obstacleManager && g.obstacleManager.list.length > 0;
     },
     { timeout: 8000 }
@@ -38,17 +39,27 @@ test("start run shows score HUD and spawns obstacles", async ({ page }) => {
   var snap = await page.evaluate(function () {
     var game = window.__trailRunnerGame;
     var g = game.scene.getScene("GameScene");
+    var ui = game.scene.getScene("UIScene");
     return {
-      running: g.registry.get("running"),
-      hudScoreVisible: g.hudScore.visible,
-      hudProgVisible: g.hudProg.visible,
+      runActive: g.runActive,
+      uiScoreVisible: ui.scoreTxt.visible,
+      uiProgVisible: ui.progTxt.visible,
       obstacleCount: g.obstacleManager.list.length,
     };
   });
 
   expect(errors, errors.join("\n")).toEqual([]);
-  expect(snap.running).toBe(true);
-  expect(snap.hudScoreVisible).toBe(true);
-  expect(snap.hudProgVisible).toBe(true);
+  expect(snap.runActive).toBe(true);
+  expect(snap.uiScoreVisible).toBe(true);
+  expect(snap.uiProgVisible).toBe(true);
   expect(snap.obstacleCount).toBeGreaterThan(0);
+
+  var jumpSnap = await page.evaluate(function () {
+    var game = window.__trailRunnerGame;
+    var g = game.scene.getScene("GameScene");
+    g.dan.setInput(g.scale.width * 0.5, g.scale.width, true);
+    return { isGrounded: g.dan.isGrounded, jumpVel: g.dan.jumpVel };
+  });
+  expect(jumpSnap.isGrounded).toBe(false);
+  expect(jumpSnap.jumpVel).toBeGreaterThan(0);
 });

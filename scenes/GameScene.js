@@ -21,8 +21,10 @@ var GameScene = new Phaser.Class({
     this.runSpeed = 118;
     this.gameOver = false;
     this.won = false;
+    /** Source of truth for “mid-run” logic (registry can be unreliable across scenes in some setups). */
+    this.runActive = false;
 
-    this.registry.set("running", false);
+    this._syncRunningRegistry(false);
     this.registry.set("score", 0);
     this.cameras.main.setScroll(0, 0);
 
@@ -83,11 +85,6 @@ var GameScene = new Phaser.Class({
     this.events.on("danLand", this.onDanLand, this);
 
     this.input.on("pointerdown", this.onPointerDown, this);
-
-    var ui = this.scene.get("UIScene") || this.scene.getScene("UIScene");
-    if (ui) {
-      ui.events.emit("fullResetToTitle");
-    }
   },
 
   shutdown: function () {
@@ -96,6 +93,13 @@ var GameScene = new Phaser.Class({
     this.events.off("beginRun", this.resetRun, this);
     this.events.off("danLand", this.onDanLand, this);
     this.input.off("pointerdown", this.onPointerDown, this);
+  },
+
+  _syncRunningRegistry: function (v) {
+    this.registry.set("running", v);
+    if (this.game && this.game.registry) {
+      this.game.registry.set("running", v);
+    }
   },
 
   hideGameHud: function () {
@@ -124,8 +128,9 @@ var GameScene = new Phaser.Class({
     this.registry.set("score", 0);
     this.obstacleManager.reset();
     this.dan.reset(this.W * 0.5, this.H * 0.88);
-    this.registry.set("running", true);
-    this.showGameHud();
+    this.runActive = true;
+    this._syncRunningRegistry(true);
+    this.hideGameHud();
     var ui = this.scene.get("UIScene") || this.scene.getScene("UIScene");
     if (ui) ui.events.emit("resetHud");
   },
@@ -142,12 +147,20 @@ var GameScene = new Phaser.Class({
    * @param {string} [reason] obstacle type: snake | soda | stream | runner | edge
    */
   onPlayerHit: function (reason) {
-    if (this.gameOver || this.won || !this.registry.get("running")) return;
+    if (this.gameOver || this.won || !this.runActive) return;
     this.gameOver = true;
-    this.registry.set("running", false);
+    this.runActive = false;
+    this._syncRunningRegistry(false);
     this.dan.triggerFall();
     var ui = this._getUiScene();
-    if (ui) ui.events.emit("playerDeath", this.registry.get("score"), reason || "hazard");
+    if (ui) {
+      var trailPct = Phaser.Math.Clamp(
+        Math.floor((this.playerZ / this.obstacleManager.TOTAL_TRAIL) * 100),
+        0,
+        100
+      );
+      ui.events.emit("playerDeath", this.registry.get("score"), reason || "hazard", trailPct);
+    }
   },
 
   _getUiScene: function () {
@@ -155,18 +168,18 @@ var GameScene = new Phaser.Class({
   },
 
   onDanLand: function () {
-    if (!this.registry.get("running") || this.gameOver) return;
+    if (!this.runActive || this.gameOver) return;
     this.dustEmitter.setPosition(this.dan.container.x, this.dan.container.y + 10);
     this.dustEmitter.explode(12);
   },
 
   onPointerDown: function () {
-    if (!this.registry.get("running") || this.gameOver || this.won) return;
+    if (!this.runActive || this.gameOver || this.won) return;
     this.dan.setInput(this.input.activePointer.x, this.W, true);
   },
 
   update: function (time, delta) {
-    var running = this.registry.get("running");
+    var running = this.runActive === true;
     var dt = delta / 1000;
 
     if (!running) {
@@ -199,11 +212,6 @@ var GameScene = new Phaser.Class({
 
     var jumpClear = !this.dan.isGrounded || this.dan.jumpY > 14;
 
-    if (Math.abs(this.dan.lane) > 0.94) {
-      this.onPlayerHit("edge");
-      return;
-    }
-
     this.obstacleManager.update(
       time,
       delta,
@@ -215,12 +223,12 @@ var GameScene = new Phaser.Class({
 
     if (this.playerZ >= this.obstacleManager.TOTAL_TRAIL) {
       this.won = true;
-      this.registry.set("running", false);
-      if (this.hudProg) this.hudProg.setText("Trail: 100%");
+      this.runActive = false;
+      this._syncRunningRegistry(false);
       var uiWin = this._getUiScene();
       if (uiWin) {
         uiWin.events.emit("progressChanged", 100);
-        uiWin.events.emit("showWin", this.registry.get("score"));
+        uiWin.events.emit("showWin", this.registry.get("score"), 100);
       }
       return;
     }
@@ -229,8 +237,12 @@ var GameScene = new Phaser.Class({
     this.obstacleManager.drawObstacles(this.playerZ, this.dan.lane, time);
 
     var prog = Math.floor((this.playerZ / this.obstacleManager.TOTAL_TRAIL) * 100);
-    if (this.hudProg) this.hudProg.setText("Trail: " + Phaser.Math.Clamp(prog, 0, 100) + "%");
     var ui = this._getUiScene();
     if (ui) ui.events.emit("progressChanged", prog);
+
+    if (Math.abs(this.dan.lane) > 0.94) {
+      this.onPlayerHit("edge");
+      return;
+    }
   },
 });
