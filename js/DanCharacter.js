@@ -16,6 +16,9 @@ function isTrailRunActive(scene) {
   return !!(reg && reg.get("running"));
 }
 
+/** 30% smaller on screen than base logo scale — easier to steer between hazards (hit logic unchanged). */
+var DAN_VISUAL_SCALE = 0.7;
+
 /** Logo SVG viewBox 0 0 56 72 — numeric constants for proportions. */
 var LOGO_SVG = {
   vbW: 56,
@@ -44,7 +47,7 @@ var LOGO_SVG = {
   brimRx: 22,
   brimRy: 7,
   /** Scale logo units to pixels on screen */
-  scale: 2.35,
+  scale: 2.35 * DAN_VISUAL_SCALE,
 };
 
 /**
@@ -232,8 +235,9 @@ function DanCharacter(scene, x, y) {
 
   this.isGrounded = true;
   this.jumpVel = 0;
-  this.jumpGravity = 0.028;
-  this.jumpPower = 0.62;
+  /** Integrated with delta in seconds (see update); higher + lower g = taller arc and longer air for streams. */
+  this.jumpGravity = 385;
+  this.jumpPower = 278;
   this.jumpY = 0;
   this.jumpSquat = 0;
   this.landSquash = 0;
@@ -255,7 +259,7 @@ function DanCharacter(scene, x, y) {
   this.container = scene.add.container(x, y);
   this.container.setDepth(2800);
 
-  this.shadow = scene.add.image(0, 18, "shadow");
+  this.shadow = scene.add.image(0, 18 * DAN_VISUAL_SCALE, "shadow");
   this.shadow.setTint(0x000000);
   this.shadow.setAlpha(0.35);
 
@@ -331,7 +335,7 @@ DanCharacter.prototype._redraw = function (time, _delta) {
 DanCharacter.prototype.setInput = function (pointerX, gameWidth, jumpRequested) {
   var gw = gameWidth > 0 ? gameWidth : 1;
   var nx = pointerX / gw;
-  this.targetLane = Phaser.Math.Clamp(nx * 2 - 1, -0.92, 0.92);
+  this.targetLane = Phaser.Math.Clamp(nx * 2 - 1, -1, 1);
 
   if (jumpRequested && this.isGrounded && !this.fallen) {
     this.jumpSquat = 0;
@@ -355,7 +359,8 @@ DanCharacter.prototype.update = function (time, delta, runSpeed) {
 
   var dt = delta / 1000;
   this.lane += (this.targetLane - this.lane) * Math.min(1, this.laneSmooth * dt);
-  this.lane = Phaser.Math.Clamp(this.lane, -0.92, 0.92);
+  /** ±1 matches trail half-width in Projection (cx ± lane×laneW); cannot steer past the wedge. */
+  this.lane = Phaser.Math.Clamp(this.lane, -1, 1);
 
   var w = this.scene.scale.width;
   var h = this.scene.scale.height;
@@ -366,8 +371,8 @@ DanCharacter.prototype.update = function (time, delta, runSpeed) {
   var onTrailX = cx + this.lane * p.halfWidth * 0.9;
 
   if (!this.isGrounded) {
-    this.jumpY += this.jumpVel * delta;
-    this.jumpVel -= this.jumpGravity * delta;
+    this.jumpY += this.jumpVel * dt;
+    this.jumpVel -= this.jumpGravity * dt;
 
     if (this.jumpY <= 0) {
       this.jumpY = 0;
@@ -402,15 +407,18 @@ DanCharacter.prototype.update = function (time, delta, runSpeed) {
   }
 
   this.shadowScale = DanMath.clamp(1 - this.jumpY * 0.0018, 0.52, 1);
-  var shadowSep = 18 + this.jumpY * 0.11;
+  var shadowSep = 18 * DAN_VISUAL_SCALE + this.jumpY * 0.11;
   var logoBobY = 0;
   if (!registryRun && this.isGrounded && !this.fallen) {
-    logoBobY = Math.sin(time * ((Math.PI * 2) / 550)) * 5;
+    logoBobY = Math.sin(time * ((Math.PI * 2) / 550)) * 5 * DAN_VISUAL_SCALE;
     shadowSep += logoBobY * 0.15;
   }
   this.shadow.setY(shadowSep);
   var squash = 1 - Math.abs(this.steerTilt) * 0.08;
-  this.shadow.setScale(this.shadowScale * squash, (this.shadowScale * 0.35) / 0.4);
+  this.shadow.setScale(
+    DAN_VISUAL_SCALE * this.shadowScale * squash,
+    (DAN_VISUAL_SCALE * this.shadowScale * 0.35) / 0.4
+  );
   this.shadow.setAlpha(0.14 + 0.28 * this.shadowScale);
 
   var targetTilt = DanMath.clamp(this.targetLane * 0.35, -0.35, 0.35);
@@ -447,7 +455,7 @@ DanCharacter.prototype.triggerFall = function () {
 
   this.scene.tweens.add({
     targets: this.container,
-    y: this.baseY + 32,
+    y: this.baseY + 32 * DAN_VISUAL_SCALE,
     duration: 520,
     ease: "Sine.easeIn",
   });
@@ -480,8 +488,8 @@ DanCharacter.prototype.reset = function (x, y) {
   this.asymPhase = Math.random() * Math.PI * 2;
 
   this.container.setPosition(x, y);
-  this.shadow.setY(18);
-  this.shadow.setScale(1, 0.35 / 0.4);
+  this.shadow.setY(18 * DAN_VISUAL_SCALE);
+  this.shadow.setScale(DAN_VISUAL_SCALE, (DAN_VISUAL_SCALE * 0.35) / 0.4);
   this.shadow.setAlpha(0.4);
   this.g.setY(0);
 

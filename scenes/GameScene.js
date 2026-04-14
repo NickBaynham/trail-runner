@@ -144,7 +144,7 @@ var GameScene = new Phaser.Class({
   },
 
   /**
-   * @param {string} [reason] obstacle type: snake | soda | stream | runner | edge
+   * @param {string} [reason] obstacle type: snake | soda | stream | runner
    */
   onPlayerHit: function (reason) {
     if (this.gameOver || this.won || !this.runActive) return;
@@ -210,7 +210,7 @@ var GameScene = new Phaser.Class({
 
     this.dan.update(time, delta, this.runSpeed);
 
-    var jumpClear = !this.dan.isGrounded || this.dan.jumpY > 14;
+    var jumpClear = !this.dan.isGrounded || this.dan.jumpY > 12;
 
     this.obstacleManager.update(
       time,
@@ -239,10 +239,5 @@ var GameScene = new Phaser.Class({
     var prog = Math.floor((this.playerZ / this.obstacleManager.TOTAL_TRAIL) * 100);
     var ui = this._getUiScene();
     if (ui) ui.events.emit("progressChanged", prog);
-
-    if (Math.abs(this.dan.lane) > 0.94) {
-      this.onPlayerHit("edge");
-      return;
-    }
   },
 });

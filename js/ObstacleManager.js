@@ -1,6 +1,15 @@
 /**
  * Spawns and updates obstacles; handles scoring for passed hazards.
  */
+/** 30% smaller on-screen art for cans/snakes only (hits use drawn sizes below). */
+var SODA_SNAKE_VISUAL_SCALE = 0.7;
+
+/**
+ * Lateral half-width of Dan on screen (px), matching DanCharacter torso half: 12 logo units × 2.35 × 0.7.
+ * Collisions use |playerX − obstacleX| < this + obstacle half-width so sprites must overlap.
+ */
+var DAN_HIT_HALF_PX = 12 * 2.35 * 0.7;
+
 function ObstacleManager(scene, gameW, gameH) {
   this.scene = scene;
   this.gameW = gameW;
@@ -28,6 +37,20 @@ ObstacleManager.prototype.reset = function () {
     g.destroy();
   });
   this.graphicsByOb.clear();
+};
+
+/** Screen X (px) for a lane at depth ahead of the player (same basis as draw). */
+ObstacleManager.prototype._laneToScreenX = function (playerZ, playerLane, lane, depth) {
+  return TrailProjection.laneToWorldX(lane, depth, playerLane, playerZ, this.gameW, this.gameH);
+};
+
+/** Lateral half-width of hazard art in px (matches drawObstacles roundedRect / snake extent). */
+ObstacleManager.prototype._hazardHalfWidthPx = function (o, depth) {
+  var sc = TrailProjection.project(depth, this.gameW, this.gameH).scale;
+  if (o.type === "soda") return 12 * sc * SODA_SNAKE_VISUAL_SCALE;
+  if (o.type === "snake") return 23 * sc * SODA_SNAKE_VISUAL_SCALE;
+  if (o.type === "runner") return 12 * sc;
+  return 12 * sc;
 };
 
 /**
@@ -111,8 +134,9 @@ ObstacleManager.prototype.update = function (time, delta, playerZ, playerLane, r
     var hitD0;
     var hitD1;
     if (o.type === "stream") {
-      hitD0 = 5;
-      hitD1 = 36;
+      /** Narrow ribbon in Z so a normal jump spans it while airborne (jumpClear). */
+      hitD0 = 16;
+      hitD1 = 26;
     } else if (o.type === "soda" || o.type === "snake") {
       hitD0 = 14;
       hitD1 = 24;
@@ -120,16 +144,27 @@ ObstacleManager.prototype.update = function (time, delta, playerZ, playerLane, r
       hitD0 = 11;
       hitD1 = 26;
     }
-    var trailP = Phaser.Math.Clamp(o.worldZ / this.TOTAL_TRAIL, 0, 1);
-    var laneMargin = 0.042 + trailP * 0.038;
 
     if (depth > hitD0 && depth < hitD1) {
       if (o.type === "stream") {
         if (!jumpClear) {
           this.scene.events.emit("playerHit", "stream");
         }
-      } else if (Math.abs(playerLane - lane) < o.hitHalfWidth + laneMargin) {
-        this.scene.events.emit("playerHit", o.type);
+      } else {
+        /** Player X must use ref lane 0 so cx + playerLane * laneW matches DanCharacter (ref=playerLane would zero out offset). */
+        var playerX = TrailProjection.laneToWorldX(
+          playerLane,
+          TrailProjection.Z_NEAR,
+          0,
+          playerZ,
+          this.gameW,
+          this.gameH
+        );
+        var obsX = this._laneToScreenX(playerZ, playerLane, lane, depth);
+        var halfO = this._hazardHalfWidthPx(o, depth);
+        if (Math.abs(playerX - obsX) <= DAN_HIT_HALF_PX + halfO) {
+          this.scene.events.emit("playerHit", o.type);
+        }
       }
     }
 
@@ -184,26 +219,28 @@ ObstacleManager.prototype.drawObstacles = function (playerZ, playerLane, time) {
     g.setPosition(wx, p.screenY);
 
     if (o.type === "soda") {
+      var hsc = sc * SODA_SNAKE_VISUAL_SCALE;
       g.fillStyle(0xf5f5f5, 1);
-      g.fillRoundedRect(-12 * sc, -28 * sc, 24 * sc, 34 * sc, 5 * sc);
+      g.fillRoundedRect(-12 * hsc, -28 * hsc, 24 * hsc, 34 * hsc, 5 * hsc);
       g.fillStyle(0xd32f2f, 1);
-      g.fillRect(-8 * sc, -25 * sc, 16 * sc, 9 * sc);
+      g.fillRect(-8 * hsc, -25 * hsc, 16 * hsc, 9 * hsc);
       g.fillStyle(0x9e9e9e, 1);
-      g.fillCircle(0, -8 * sc, 3 * sc);
+      g.fillCircle(0, -8 * hsc, 3 * hsc);
     } else if (o.type === "snake") {
-      var wiggle = Math.sin(time * 0.008 + o.worldZ * 0.1) * 6 * sc;
-      g.lineStyle(Math.max(3, 5 * sc), 0xe65100, 1);
+      var hscSnake = sc * SODA_SNAKE_VISUAL_SCALE;
+      var wiggle = Math.sin(time * 0.008 + o.worldZ * 0.1) * 6 * hscSnake;
+      g.lineStyle(Math.max(3, 5 * hscSnake), 0xe65100, 1);
       g.beginPath();
-      g.moveTo(-24 * sc, 5 * sc + wiggle * 0.15);
+      g.moveTo(-24 * hscSnake, 5 * hscSnake + wiggle * 0.15);
       for (var si = 0; si < 7; si++) {
         g.lineTo(
-          (-24 + si * 7) * sc,
-          Math.sin(si * 1.1 + time * 0.014) * 6 * sc + wiggle * 0.08
+          (-24 + si * 7) * hscSnake,
+          Math.sin(si * 1.1 + time * 0.014) * 6 * hscSnake + wiggle * 0.08
         );
       }
       g.strokePath();
       g.fillStyle(0x1a1a1a, 1);
-      g.fillCircle(22 * sc, -2 * sc + wiggle * 0.12, 5 * sc);
+      g.fillCircle(22 * hscSnake, -2 * hscSnake + wiggle * 0.12, 5 * hscSnake);
     } else if (o.type === "stream") {
       var sw = p.halfWidth * 1.85 * sc;
       g.fillStyle(0x0d47a1, 0.88);

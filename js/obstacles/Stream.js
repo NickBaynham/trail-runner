@@ -13,6 +13,7 @@ function Stream(scene, lane, worldZ, progress01) {
 Stream.prototype = Object.create(Obstacle.prototype);
 Stream.prototype.constructor = Stream;
 
+/** Stream stays centered on the trail; no lateral or Z drift (base Obstacle.update is a no-op). */
 Stream.prototype.getLane = function (_time) {
   return 0;
 };
